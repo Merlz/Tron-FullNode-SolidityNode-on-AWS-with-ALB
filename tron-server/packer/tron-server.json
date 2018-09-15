@@ -1,0 +1,87 @@
+{
+  "variables": {
+    "aws_region": "us-east-1",
+    "aws_vpc_id": "",
+    "aws_subnet_id": "",
+    "ami_name": "tron-server-ubuntu-16"
+  },
+  "builders": [
+    {
+      "name": "ubuntu-ami",
+      "ami_name": "{{user `ami_name`}}-{{isotime | clean_ami_name}}",
+      "ami_description": "An Ubuntu 16.04 AMI for Tron Server",
+      "instance_type": "t2.large",
+      "region": "{{user `aws_region`}}",
+      "vpc_id": "{{user `aws_vpc_id`}}",
+      "subnet_id": "{{user `aws_subnet_id`}}",
+      "type": "amazon-ebs",
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "architecture": "x86_64",
+          "name": "*ubuntu-xenial-16.04-amd64-server-*",
+          "block-device-mapping.volume-type": "gp2",
+          "root-device-type": "ebs"
+        },
+        "owners": [
+          "099720109477"
+        ],
+        "most_recent": true
+      },
+      "ssh_username": "ubuntu",
+      "encrypt_boot": false
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "echo 'Sleeping for 60 seconds to give the AMIs enough time to initialize (otherwise, packages may fail to install).'",
+        "sleep 60"
+      ]
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "echo 'Update and install all system and distribution packages'",
+        "DEBIAN_FRONTEND=noninteractive sudo apt-get update -y && sudo apt-get upgrade -y && sudo apt-get dist-upgrade -y",
+        "echo 'Install packages to allow apt to use a repository over HTTPS'",
+        "sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common",
+        "echo 'Install additional tools'",
+        "sudo apt-get install -y jq git python-pip htop iotop sysstat nload vim nvme-cli"
+      ]
+    },
+    {
+      "type": "shell",
+      "pause_before": "15s",
+      "inline": [
+        "echo 'Upgrade PIP'",
+        "sudo -H pip install --upgrade pip",
+        "echo 'Install AWS CLI, required for monitoring scripts'",
+        "sudo -H pip install awscli"
+      ]
+    },
+    {
+      "type": "shell",
+      "pause_before": "15s",
+      "inline": [
+        "echo 'Install Oracle JDK'",
+        "sudo add-apt-repository ppa:webupd8team/java",
+        "DEBIAN_FRONTEND=noninteractive sudo apt-get update -y",
+        "echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections",
+        "echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections",
+        "sudo apt-get install -y oracle-java8-installer",
+        "sudo apt-get install -y oracle-java8-set-default"
+      ]
+    },
+    {
+      "type": "shell",
+      "pause_before": "15s",
+      "inline": [
+        "echo 'Cleanup un-needed packages'",
+        "sudo apt-get autoremove -y",
+        "sudo apt-get purge -y"
+      ]
+    }
+  ]
+}
